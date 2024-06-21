@@ -1,28 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, TextInput, Button, Text, FlatList, StyleSheet } from 'react-native';
+import { View, TextInput, Button, Text, FlatList, StyleSheet, TouchableOpacity } from 'react-native';
 import { teams, ID } from './appwriteConfig';
 
 const TeamScreen = () => {
-  const [teamId, setTeamId] = useState('');
-  const [email, setEmail] = useState('');
   const [teamName, setTeamName] = useState('');
   const [teamList, setTeamList] = useState([]);
+  const [selectedTeam, setSelectedTeam] = useState(null);
+  const [email, setEmail] = useState('');
+  const [invitations, setInvitations] = useState({});
 
   const createTeam = async () => {
     try {
       const response = await teams.create(ID.unique(), teamName);
-      setTeamId(response.$id);
       fetchTeams();
+      setSelectedTeam(response.$id);
+      setTeamName('');
     } catch (error) {
       console.log(error);
     }
   };
 
-  const inviteMember = async () => {
-    try {
-      await teams.createMembership(teamId, ['guests'], email);
-    } catch (error) {
-      console.log(error);
+  const addLocalMember = () => {
+    if (email && selectedTeam) {
+      setInvitations((prev) => ({
+        ...prev,
+        [selectedTeam]: [...(prev[selectedTeam] || []), email],
+      }));
+      setEmail('');
     }
   };
 
@@ -39,8 +43,39 @@ const TeamScreen = () => {
     fetchTeams();
   }, []);
 
+  const renderTeamItem = ({ item }) => (
+    <View style={styles.listItem}>
+      <TouchableOpacity onPress={() => setSelectedTeam(item.$id)}>
+        <Text style={styles.teamName}>{item.name}</Text>
+      </TouchableOpacity>
+      {selectedTeam === item.$id && (
+        <View style={styles.invitationContainer}>
+          <TextInput
+            style={styles.input}
+            placeholder="Email"
+            value={email}
+            onChangeText={setEmail}
+          />
+          <Button
+            title="Add Member"
+            onPress={addLocalMember}
+            color="#20B2AA" // Light Sea Green color
+          />
+          <FlatList
+            data={invitations[item.$id] || []}
+            keyExtractor={(email, index) => index.toString()}
+            renderItem={({ item }) => (
+              <Text style={styles.email}>{item}</Text>
+            )}
+          />
+        </View>
+      )}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
+
       <TextInput
         style={styles.input}
         placeholder="Team Name"
@@ -52,26 +87,11 @@ const TeamScreen = () => {
         onPress={createTeam}
         color="#4682B4" // Steel Blue color
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-      />
-      <Button
-        title="Invite Member"
-        onPress={inviteMember}
-        color="#20B2AA" // Light Sea Green color
-      />
       <FlatList
         style={styles.list}
         data={teamList}
         keyExtractor={(item) => item.$id}
-        renderItem={({ item }) => (
-          <View style={styles.listItem}>
-            <Text>{item.name}</Text>
-          </View>
-        )}
+        renderItem={renderTeamItem}
       />
     </View>
   );
@@ -99,6 +119,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#ccc',
+  },
+  teamName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  invitationContainer: {
+    marginTop: 10,
+    paddingLeft: 20,
+  },
+  email: {
+    fontSize: 16,
+    marginTop: 5,
   },
 });
 
